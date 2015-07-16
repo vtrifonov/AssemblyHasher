@@ -28,13 +28,13 @@ namespace AssemblyHasher
             {
                 Folder = folder;
                 ILFilename = ilFilename;
-                Resources = Directory.EnumerateFiles(Folder).Where(filename => filename != ilFilename).ToArray();
+                Resources = Directory.EnumerateFiles(Folder)
+                    .Where(filename => filename != ilFilename && !regexPostSharpResourceFiles.IsMatch(Path.GetFileName(filename) ?? ""))
+                    .ToArray();
             }
         }
 
-        public static Regex regexMVID = new Regex("//\\s*MVID\\:\\s*\\{[a-zA-Z0-9\\-]+\\}", RegexOptions.Multiline | RegexOptions.Compiled);
-        public static Regex regexImageBase = new Regex("//\\s*Image\\s+base\\:\\s0x[0-9A-Fa-f]*", RegexOptions.Multiline | RegexOptions.Compiled);
-        public static Regex regexTimeStamp = new Regex("//\\s*Time-date\\s+stamp\\:\\s*0x[0-9A-Fa-f]*", RegexOptions.Multiline | RegexOptions.Compiled);
+        public static Regex regexPostSharpResourceFiles = new Regex("^PostSharp\\.Aspects\\.[0-9\\.]+$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         private static readonly Lazy<Assembly> currentAssembly = new Lazy<Assembly>(() =>
         {
@@ -63,8 +63,11 @@ namespace AssemblyHasher
 
         static Disassembler()
         {
-            //extract the ildasm file to the executing assembly location
-            ExtractFileToLocation("ildasm.exe", ILDasmFileLocation);
+            if (!File.Exists(ILDasmFileLocation))
+            {
+                //extract the ildasm file to the executing assembly location
+                ExtractFileToLocation("ildasm.exe", ILDasmFileLocation);
+            }
         }
 
         /// <summary>
@@ -165,20 +168,7 @@ namespace AssemblyHasher
             }
 
             var ilFilename = Path.Combine(outputFolder, "output.il");
-            RemoveUnnededRows(ilFilename);
             return new DissasembleOutput(outputFolder, ilFilename);
-        }
-
-        private static void RemoveUnnededRows(string fileName)
-        {
-            string fileContent = File.ReadAllText(fileName);
-            //remove MVID
-            fileContent = regexMVID.Replace(fileContent, string.Empty);
-            //remove Image Base
-            fileContent = regexImageBase.Replace(fileContent, string.Empty);
-            //remove Time Stamp
-            fileContent = regexTimeStamp.Replace(fileContent, string.Empty);
-            File.WriteAllText(fileName, fileContent);
         }
     }
 }
